@@ -1,9 +1,13 @@
 import React, { Component } from 'react'
 import { Text, ImageBackground, StyleSheet, View, TouchableOpacity, Alert } from 'react-native'
 
+import axios from 'axios'
+
 import backgroundImage from '../../assets/imgs/login.jpg'
 import commonStyles from '../commonStyles'
 import AuthInput from '../components/AuthInput'
+
+import { server, showError, showSuccess } from '../common'
 
 const initialState = {
     name: '',
@@ -21,13 +25,55 @@ export default class Auth extends Component {
 
     siginOrSignup = () => {
         if(this.state.stageNew) {
-            Alert.alert('Sucesso!', 'Criar a conta')
+            this.signup()
         } else {
-            Alert.alert('Sucesso!', 'Logar')
+            this.signin()
+        }
+    }
+
+    signup = async () => {
+        try {
+            await axios.post(`${server}/signup`, {
+                name: this.state.name,
+                email: this.state.email,
+                password: this.state.password,
+                confirmPassword: this.state.confirmPassword,
+            })
+
+            showSuccess('Usuário cadastrado com sucesso!')
+            this.setState({ ...initialState })
+        } catch(e) {
+            showError(e)
+        }
+    }
+
+    signin = async () => {
+        try {
+            const res = await axios.post(`${server}/signin`, {
+                email: this.state.email,
+                password: this.state.password,
+            })
+
+            axios.defaults.headers.common['Authorization'] = `bearer ${res.data.token}`
+            this.props.navigation.navigate('Home')
+        } catch (e) {
+            showError(e)
         }
     }
 
     render() {
+        const validations = []
+        validations.push(this.state.email && this.state.email.includes('@'))
+        validations.push(this.state.password && this.state.password.length >= 6)
+
+        if(this.state.stageNew) {
+            validations.push(this.state.name && this.state.name.trim().length >= 3)
+            validations.push(this.state.password === this.state.confirmPassword)
+        }
+
+        //Se todas as validações for verdadeira, é retornado true, se qualquer validação for false é retornado false
+        const validForm = validations.reduce((t, a) => t && a)
+
         return(
             <ImageBackground style = {styles.background}
                 source = {backgroundImage}>
@@ -55,8 +101,9 @@ export default class Auth extends Component {
                                                     style = {styles.input} secureTextEntry = {true}
                                                     onChangeText = {confirmPassword => this.setState({ confirmPassword })}/>
                     }
-                    <TouchableOpacity onPress = {this.siginOrSignup}>
-                        <View style = {styles.button}>
+                    <TouchableOpacity onPress = {this.siginOrSignup}
+                        disabled = {!validForm}>
+                        <View style = {[styles.button, validForm ? {} : { backgroundColor: '#AAA' }]}>
                             <Text style = {styles.buttonText}>
                                 {this.state.stageNew ? 'Registrar' : 'Entrar'}
                             </Text>
